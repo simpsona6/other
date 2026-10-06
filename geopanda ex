@@ -1,0 +1,19 @@
+#ex
+import geopandas as gpd
+
+parcels = gpd.read_file("xxxxxxx.gpkg")
+wetlands = gpd.read_file("xxxxxxx.shp")
+
+# check CRS
+print(parcels.crs, wetlands.crs)
+wetlands = wetlands.to_crs(parcels.crs)
+
+# fix geometry
+print((~parcels.is_valid).sum(), "invalid parcels")
+parcels["geometry"] = parcels.make_valid()
+
+# schmema check example
+required = {"parcel_id", "acres", "owner"}
+missing = required - set(parcels.columns)
+if missing:
+    raise ValueError(f"Missing fields: {missing}")
