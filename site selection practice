@@ -1,0 +1,61 @@
+import arcpy
+
+sde = r"\\metanoia\GeoData\ESRI\ArcSDE_connections\Connection to GISPRDDB direct connect.sde"
+fc = f"{sde}\\cvGIS.CITY.parcel_area"
+exclude_fc = f"{sde}\\cvGIS.CITY.structure_existing_area"
+
+#cleanup
+for item in ["parcel_lyr", "memory\\potential_sites"]:
+    if arcpy.Exists(item):
+        arcpy.management.Delete(item)
+
+zones = ["IX-5", "IX-8", "CV", "CM"]
+where_clause = "ZONE IN ({})".format(",".join(f"'{z}'" for z in zones))
+
+desc = arcpy.da.Describe(fc)
+units = desc["spatialReference"].linearUnitName
+
+SQFT_TO_ACRES = 1 / 43560
+SQM_TO_ACRES = 1 / 4046.8564224
+
+if "Foot" in units:
+    conversion = SQFT_TO_ACRES
+elif "Meter" in units:
+    conversion = SQM_TO_ACRES
+else:
+    print("Unrecognized units")
+    conversion = 1
+
+arcpy.management.MakeFeatureLayer(fc, "parcel_lyr", where_clause)
+
+arcpy.management.SelectLayerByLocation(
+    "parcel_lyr", "INTERSECT", exclude_fc, selection_type="NEW_SELECTION"
+)
+arcpy.management.SelectLayerByLocation(
+    "parcel_lyr", "INTERSECT", exclude_fc, selection_type="SWITCH_SELECTION"
+)
+
+count_selected = int(arcpy.management.GetCount("parcel_lyr")[0])
+print(f"Parcels without structures: {count_selected}")
+if count_selected == 0:
+    arcpy.management.Delete("parcel_lyr")
+    raise RuntimeError("No potential sites found — check inputs before continuing.")
+
+arcpy.management.CopyFeatures("parcel_lyr", "memory\\potential_sites")
+arcpy.management.Delete("parcel_lyr")
+
+fields = ["ZONE", "SHAPE@AREA", "PIN"]
+
+with arcpy.da.SearchCursor("memory\\potential_sites", fields) as cursor:
+    total_acres = 0
+    count = 0
+    for zone, shape_area, pin in cursor:
+        acres = shape_area * conversion
+        total_acres += acres
+        count += 1
+        print(f"Pin {pin} | Zone: {zone} | Area: {acres:.3f} acres")
+
+    print(f"\nTotal features: {count}")
+    #print(f"Total acres: {total_acres:.3f}")
+
+#arcpy.management.Delete("memory\\potential_sites")
