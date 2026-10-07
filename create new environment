@@ -1,0 +1,7 @@
+#create and add some relev stuff
+conda create -n NEWENVIRONMENTNAME -c conda-forge --override-channels python=3.12 geopandas pyogrio shapely pyproj matplotlib folium mapclassify ipykernel requests
+
+
+#test
+conda activate NEWENVIRONMENTNAME
+python -c "import geopandas; print(geopandas.__version__)"
